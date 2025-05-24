@@ -1,5 +1,7 @@
 # Environments
 .env
 .venv
+.idea
+.idea/
 temp.py
 env/
