@@ -105,6 +105,7 @@ async def handle_call_tool(
         name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     if name == "calculate":
+        print('using calculate tool')
         if not arguments or "expression" not in arguments:
             raise ValueError("Missing expression")
 
@@ -115,6 +116,7 @@ async def handle_call_tool(
             return [types.TextContent(type="text", text=f"ERROR: {str(e)}")]
 
     elif name == "get_weather":
+        print('using get_weather tool')
         if not arguments or "city" not in arguments:
             raise ValueError("Missing city")
 
@@ -122,6 +124,7 @@ async def handle_call_tool(
         return [types.TextContent(type="text", text=f"WEATHER: {city} - Sunny, 22°C")]
 
     elif name == "create_image":
+        print('using create_image tool')
         if not arguments or "color" not in arguments:
             raise ValueError("Missing color")
 
@@ -140,6 +143,7 @@ async def handle_call_tool(
         )]
 
     elif name == "embed_resource":
+        print('using resources')
         if not arguments or "resource_uri" not in arguments:
             raise ValueError("Missing resource_uri")
 

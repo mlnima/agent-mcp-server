@@ -7,6 +7,8 @@ import uvicorn
 import json
 import re
 import base64
+import pathlib
+import shutil
 
 load_dotenv()
 
@@ -37,27 +39,108 @@ class OllamaClient:
             raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
 
 
+class SecureFileManager:
+    def __init__(self):
+        self.workspace_root = pathlib.Path("workspace").resolve()
+        self.workspace_root.mkdir(exist_ok=True)
+
+    def _validate_path(self, path_str: str):
+        try:
+            path = pathlib.Path(path_str)
+            if path.is_absolute():
+                raise ValueError("Absolute paths not allowed")
+
+            full_path = (self.workspace_root / path).resolve()
+
+            if not str(full_path).startswith(str(self.workspace_root)):
+                raise ValueError("Path outside workspace")
+
+            return full_path
+        except Exception as e:
+            raise ValueError(f"Invalid path: {e}")
+
+    def read_file(self, path_str: str):
+        path = self._validate_path(path_str)
+        if not path.exists():
+            return f"ERROR: File not found: {path_str}"
+        if not path.is_file():
+            return f"ERROR: Not a file: {path_str}"
+        try:
+            content = path.read_text(encoding='utf-8')
+            return f"CONTENT: {content}"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def write_file(self, path_str: str, content: str):
+        path = self._validate_path(path_str)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding='utf-8')
+            return f"SUCCESS: Written to {path_str}"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def delete_file(self, path_str: str):
+        path = self._validate_path(path_str)
+        if not path.exists():
+            return f"ERROR: File not found: {path_str}"
+        try:
+            if path.is_file():
+                path.unlink()
+                return f"SUCCESS: Deleted file {path_str}"
+            elif path.is_dir():
+                shutil.rmtree(path)
+                return f"SUCCESS: Deleted directory {path_str}"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def list_directory(self, path_str: str = "."):
+        path = self._validate_path(path_str)
+        if not path.exists():
+            return f"ERROR: Directory not found: {path_str}"
+        if not path.is_dir():
+            return f"ERROR: Not a directory: {path_str}"
+        try:
+            items = []
+            for item in path.iterdir():
+                item_type = "DIR" if item.is_dir() else "FILE"
+                rel_path = item.relative_to(self.workspace_root)
+                items.append(f"{item_type}: {rel_path}")
+            return f"LISTING: {chr(10).join(items)}"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+    def create_directory(self, path_str: str):
+        path = self._validate_path(path_str)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return f"SUCCESS: Created directory {path_str}"
+        except Exception as e:
+            return f"ERROR: {e}"
+
+
 class AdvancedAgent:
     def __init__(self):
         self.ollama = OllamaClient()
-        self.resources = {
-            "file://sample.txt": "This is a sample text file content.",
-            "file://data.json": '{"name": "test", "value": 42}',
-            "file://info.md": "# Sample Markdown\n\nThis is **bold** text."
-        }
+        self.file_manager = SecureFileManager()
         self.tools = {
             "calculate": self.calculate,
             "get_weather": self.get_weather,
             "create_image": self.create_image,
-            "embed_resource": self.embed_resource,
-            "read_resource": self.read_resource
+            "read_file": self.read_file,
+            "write_file": self.write_file,
+            "delete_file": self.delete_file,
+            "list_directory": self.list_directory,
+            "create_directory": self.create_directory
         }
 
     def sanitize_output(self, text: str):
         patterns = [
             r"RESULT:\s*(.+)",
             r"WEATHER:\s*(.+)",
-            r"RESOURCE:\s*(.+)",
+            r"CONTENT:\s*(.+)",
+            r"SUCCESS:\s*(.+)",
+            r"LISTING:\s*(.+)",
             r"ERROR:\s*(.+)"
         ]
 
@@ -88,35 +171,46 @@ class AdvancedAgent:
         encoded = base64.b64encode(svg_data.encode()).decode()
         return f"IMAGE: data:image/svg+xml;base64,{encoded}"
 
-    def embed_resource(self, resource_uri: str):
-        if resource_uri in self.resources:
-            content = self.resources[resource_uri]
-            return f"RESOURCE: {resource_uri} - {content[:100]}..."
-        return f"ERROR: Resource not found: {resource_uri}"
+    def read_file(self, path: str):
+        return self.file_manager.read_file(path)
 
-    def read_resource(self, resource_uri: str):
-        if resource_uri in self.resources:
-            return f"RESOURCE: {self.resources[resource_uri]}"
-        return f"ERROR: Resource not found: {resource_uri}"
+    def write_file(self, path_and_content: str):
+        parts = path_and_content.split('|', 1)
+        if len(parts) != 2:
+            return "ERROR: Use format: path|content"
+        return self.file_manager.write_file(parts[0].strip(), parts[1])
+
+    def delete_file(self, path: str):
+        return self.file_manager.delete_file(path)
+
+    def list_directory(self, path: str = "."):
+        return self.file_manager.list_directory(path)
+
+    def create_directory(self, path: str):
+        return self.file_manager.create_directory(path)
 
     def process_request(self, message: str, sanitize: bool = True):
-        tool_descriptions = """Available tools and resources:
-TOOLS:
+        tool_descriptions = """Available tools (workspace directory only):
+FILE OPERATIONS:
+- read_file(path): Read file content
+- write_file(path|content): Write content to file 
+- delete_file(path): Delete file or directory
+- list_directory(path): List directory contents
+- create_directory(path): Create directory
+
+OTHER TOOLS:
 - calculate(expression): Math calculations
 - get_weather(city): Weather info
-- create_image(color, size): Generate colored image
-- embed_resource(uri): Embed resource content
-- read_resource(uri): Read resource content
+- create_image(color,size): Generate colored image
 
-RESOURCES:
-- file://sample.txt: Sample text file
-- file://data.json: JSON data
-- file://info.md: Markdown document
+SECURITY: Only workspace/ directory accessible. No parent/sibling access.
 
-To use a tool, respond with: USE_TOOL:tool_name:arguments
-Example: USE_TOOL:calculate:15*7+3
-Example: USE_TOOL:get_weather:Paris
-Example: USE_TOOL:read_resource:file://sample.txt
+To use: USE_TOOL:tool_name:arguments
+Examples:
+USE_TOOL:read_file:project1/readme.txt
+USE_TOOL:write_file:project1/test.txt|Hello World
+USE_TOOL:list_directory:project1
+USE_TOOL:create_directory:project1/subfolder
 
 User: {message}"""
 
@@ -172,24 +266,25 @@ async def chat_raw(request: AgentRequest):
 async def list_tools():
     return {
         "tools": [
-            {"name": "calculate", "description": "Perform mathematical calculations"},
+            {"name": "read_file", "description": "Read file from workspace"},
+            {"name": "write_file", "description": "Write file to workspace (path|content)"},
+            {"name": "delete_file", "description": "Delete file/directory from workspace"},
+            {"name": "list_directory", "description": "List directory contents"},
+            {"name": "create_directory", "description": "Create directory in workspace"},
+            {"name": "calculate", "description": "Mathematical calculations"},
             {"name": "get_weather", "description": "Get weather information"},
-            {"name": "create_image", "description": "Create colored SVG image"},
-            {"name": "embed_resource", "description": "Embed resource content"},
-            {"name": "read_resource", "description": "Read resource content"}
+            {"name": "create_image", "description": "Create colored SVG image"}
         ]
     }
 
 
-@app.get("/resources")
-async def list_resources():
-    return {
-        "resources": [
-            {"uri": "file://sample.txt", "name": "Sample Text", "type": "text/plain"},
-            {"uri": "file://data.json", "name": "JSON Data", "type": "application/json"},
-            {"uri": "file://info.md", "name": "Markdown", "type": "text/markdown"}
-        ]
-    }
+@app.get("/workspace")
+async def list_workspace():
+    try:
+        result = agent.file_manager.list_directory(".")
+        return {"workspace": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

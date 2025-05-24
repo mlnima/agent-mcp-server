@@ -16,82 +16,57 @@ def test_agent():
     time.sleep(3)
 
     try:
-        print("=== Testing MCP Agent with All Features ===\n")
+        print("=== Testing Secure File System Agent ===\n")
 
         print("1. Testing /tools endpoint...")
         response = requests.get(f"{base_url}/tools")
         print(f"Tools: {response.json()}\n")
 
-        print("2. Testing /resources endpoint...")
-        response = requests.get(f"{base_url}/resources")
-        print(f"Resources: {response.json()}\n")
+        print("2. Testing /workspace endpoint...")
+        response = requests.get(f"{base_url}/workspace")
+        print(f"Workspace: {response.json()}\n")
 
-        print("3. Testing TextContent - Math calculation...")
+        print("3. Creating test project directory...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Create a directory called project1"
+        })
+        print(f"Create dir: {response.json()['response']}\n")
+
+        print("4. Writing test file...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Write a file project1/readme.txt with content: This is a test file for project1"
+        })
+        print(f"Write file: {response.json()['response']}\n")
+
+        print("5. Reading the file...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Read the file project1/readme.txt"
+        })
+        print(f"Read file: {response.json()['response']}\n")
+
+        print("6. Listing directory contents...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "List contents of project1 directory"
+        })
+        print(f"List dir: {response.json()['response']}\n")
+
+        print("7. Testing security - trying to access parent directory...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Read file ../ai-agent.py"
+        })
+        print(f"Security test: {response.json()['response']}\n")
+
+        print("8. Testing calculation...")
         response = requests.post(f"{base_url}/chat", json={
             "message": "Calculate 25 * 4 + 15"
         })
-        print(f"Calculation (sanitized): {response.json()['response']}")
+        print(f"Calculation: {response.json()['response']}\n")
 
-        response = requests.post(f"{base_url}/chat/raw", json={
-            "message": "Use calculate tool for 25 * 4 + 15"
-        })
-        print(f"Calculation (raw): {response.json()['response']}\n")
-
-        print("4. Testing TextContent - Weather...")
+        print("9. Deleting test file...")
         response = requests.post(f"{base_url}/chat", json={
-            "message": "Get weather for Tokyo"
+            "message": "Delete the file project1/readme.txt"
         })
-        print(f"Weather (sanitized): {response.json()['response']}")
-
-        response = requests.post(f"{base_url}/chat/raw", json={
-            "message": "Use get_weather tool for Tokyo"
-        })
-        print(f"Weather (raw): {response.json()['response']}\n")
-
-        print("5. Testing ImageContent - Create image...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Create a red image with size 150"
-        })
-        print(f"Image creation (sanitized): {response.json()['response'][:100]}...")
-
-        response = requests.post(f"{base_url}/chat/raw", json={
-            "message": "Use create_image tool: red, 150"
-        })
-        print(f"Image creation (raw): {response.json()['response'][:100]}...\n")
-
-        print("6. Testing Resource - Read text file...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Read the sample text file"
-        })
-        print(f"Read resource (sanitized): {response.json()['response']}")
-
-        response = requests.post(f"{base_url}/chat/raw", json={
-            "message": "Use read_resource tool: file://sample.txt"
-        })
-        print(f"Read resource (raw): {response.json()['response']}\n")
-
-        print("7. Testing EmbeddedResource - Embed JSON...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Embed the JSON data file"
-        })
-        print(f"Embed resource (sanitized): {response.json()['response']}")
-
-        response = requests.post(f"{base_url}/chat/raw", json={
-            "message": "Use embed_resource tool: file://data.json"
-        })
-        print(f"Embed resource (raw): {response.json()['response']}\n")
-
-        print("8. Testing general conversation...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Hello, what can you do?"
-        })
-        print(f"General chat: {response.json()['response']}\n")
-
-        print("9. Testing error handling...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Calculate invalid expression: 5 / 0"
-        })
-        print(f"Error handling: {response.json()['response']}")
+        print(f"Delete file: {response.json()['response']}")
 
     except Exception as e:
         print(f"Test error: {e}")
