@@ -16,39 +16,89 @@ def test_agent():
     time.sleep(3)
 
     try:
-        print("Testing /tools endpoint...")
+        print("=== Testing MCP Agent with All Features ===\n")
+
+        print("1. Testing /tools endpoint...")
         response = requests.get(f"{base_url}/tools")
-        print(f"Tools response: {response.json()}")
+        print(f"Tools: {response.json()}\n")
 
-        print("\nTesting calculation...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "Calculate 15 * 7 + 3"
-        })
-        print(f"Calculation response: {response.json()}")
+        print("2. Testing /resources endpoint...")
+        response = requests.get(f"{base_url}/resources")
+        print(f"Resources: {response.json()}\n")
 
-        print("\nTesting direct calculation...")
+        print("3. Testing TextContent - Math calculation...")
         response = requests.post(f"{base_url}/chat", json={
-            "message": "Use calculate tool: 25 + 17"
+            "message": "Calculate 25 * 4 + 15"
         })
-        print(f"Direct calculation response: {response.json()}")
+        print(f"Calculation (sanitized): {response.json()['response']}")
 
-        print("\nTesting weather...")
-        response = requests.post(f"{base_url}/chat", json={
-            "message": "What's the weather in Paris?"
+        response = requests.post(f"{base_url}/chat/raw", json={
+            "message": "Use calculate tool for 25 * 4 + 15"
         })
-        print(f"Weather response: {response.json()}")
+        print(f"Calculation (raw): {response.json()['response']}\n")
 
-        print("\nTesting general chat...")
+        print("4. Testing TextContent - Weather...")
         response = requests.post(f"{base_url}/chat", json={
-            "message": "Hello, how are you?"
+            "message": "Get weather for Tokyo"
         })
-        print(f"Chat response: {response.json()}")
+        print(f"Weather (sanitized): {response.json()['response']}")
+
+        response = requests.post(f"{base_url}/chat/raw", json={
+            "message": "Use get_weather tool for Tokyo"
+        })
+        print(f"Weather (raw): {response.json()['response']}\n")
+
+        print("5. Testing ImageContent - Create image...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Create a red image with size 150"
+        })
+        print(f"Image creation (sanitized): {response.json()['response'][:100]}...")
+
+        response = requests.post(f"{base_url}/chat/raw", json={
+            "message": "Use create_image tool: red, 150"
+        })
+        print(f"Image creation (raw): {response.json()['response'][:100]}...\n")
+
+        print("6. Testing Resource - Read text file...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Read the sample text file"
+        })
+        print(f"Read resource (sanitized): {response.json()['response']}")
+
+        response = requests.post(f"{base_url}/chat/raw", json={
+            "message": "Use read_resource tool: file://sample.txt"
+        })
+        print(f"Read resource (raw): {response.json()['response']}\n")
+
+        print("7. Testing EmbeddedResource - Embed JSON...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Embed the JSON data file"
+        })
+        print(f"Embed resource (sanitized): {response.json()['response']}")
+
+        response = requests.post(f"{base_url}/chat/raw", json={
+            "message": "Use embed_resource tool: file://data.json"
+        })
+        print(f"Embed resource (raw): {response.json()['response']}\n")
+
+        print("8. Testing general conversation...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Hello, what can you do?"
+        })
+        print(f"General chat: {response.json()['response']}\n")
+
+        print("9. Testing error handling...")
+        response = requests.post(f"{base_url}/chat", json={
+            "message": "Calculate invalid expression: 5 / 0"
+        })
+        print(f"Error handling: {response.json()['response']}")
 
     except Exception as e:
         print(f"Test error: {e}")
     finally:
         agent_process.terminate()
         agent_process.wait()
+        print("\n=== Test completed ===")
 
 
 if __name__ == "__main__":
